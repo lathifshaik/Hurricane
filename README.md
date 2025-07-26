@@ -18,7 +18,7 @@ Hurricane is an intelligent AI coding assistant powered by Ollama that helps you
 
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone  https://github.com/lathifshaik/Hurricane.git
 cd hurricane
 
 # Install dependencies
