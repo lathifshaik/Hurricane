@@ -5,6 +5,7 @@ Coordinates specialized agents for different tasks and manages workflow orchestr
 
 import asyncio
 import json
+import logging
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass, asdict
@@ -19,6 +20,9 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from ..core.config import Config
 from ..core.ollama_client import OllamaClient
+
+# Set up logging
+logger = logging.getLogger(__name__)
 
 console = Console()
 
@@ -115,6 +119,10 @@ class MultiAgentSystem:
         self.active_workflows = {}
         self.task_queue = []
         self.coordination_running = False
+        
+        # Thread safety
+        self._task_queue_lock = asyncio.Lock()
+        self._workflow_lock = asyncio.Lock()
     
     def _initialize_agents(self) -> Dict[AgentRole, Agent]:
         """Initialize specialized agents."""

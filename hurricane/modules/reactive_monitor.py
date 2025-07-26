@@ -5,7 +5,7 @@ Provides file system monitoring, continuous analysis, and intelligent notificati
 
 import asyncio
 import json
-import time
+import logging
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Callable
 from dataclasses import dataclass, asdict
@@ -23,6 +23,10 @@ from rich.text import Text
 
 from ..core.config import Config
 from ..core.ollama_client import OllamaClient
+
+# Set up logging
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
 console = Console()
 
@@ -123,14 +127,24 @@ class ReactiveMonitor:
         self.config = config
         self.project_root = Path(project_root)
         
-        # Monitoring state
-        self.is_monitoring = False
-        self.observer = None
+        # Storage with error recovery
+        self.hurricane_dir = self.project_root / ".hurricane"
+        try:
+            self.hurricane_dir.mkdir(exist_ok=True)
+        except PermissionError:
+            logger.error(f"Permission denied creating {self.hurricane_dir}")
+            # Fallback to temp directory
+            import tempfile
+            self.hurricane_dir = Path(tempfile.gettempdir()) / "hurricane_fallback"
+            self.hurricane_dir.mkdir(exist_ok=True)
+            logger.info(f"Using fallback directory: {self.hurricane_dir}")
         self.event_queue = Queue()
         self.notifications = []
         self.monitoring_thread = None
         
-        # Storage
+        # Monitoring state
+        self.is_monitoring = False
+        self.observer = None
         self.hurricane_dir = self.project_root / ".hurricane"
         self.hurricane_dir.mkdir(exist_ok=True)
         
@@ -437,7 +451,8 @@ class ReactiveMonitor:
                         )
                         break  # Only report first pattern found per file
                 
-            except Exception:
+            except Exception as e:
+                logger.warning(f"Could not analyze file {file_path}: {e}")
                 continue  # Skip files that can't be read
     
     async def _check_project_health(self):

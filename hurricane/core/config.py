@@ -4,9 +4,13 @@ Configuration management for Hurricane AI Agent.
 
 import os
 import yaml
+import logging
 from pathlib import Path
 from typing import Dict, Any, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
+
+# Set up logging
+logger = logging.getLogger(__name__)
 
 
 class OllamaConfig(BaseModel):
@@ -39,13 +43,40 @@ class Config(BaseModel):
             config_path = cls.get_default_config_path()
         
         if config_path.exists():
-            with open(config_path, 'r') as f:
-                config_data = yaml.safe_load(f)
-            return cls(**config_data)
+            try:
+                with open(config_path, 'r') as f:
+                    config_data = yaml.safe_load(f)
+                
+                if config_data is None:
+                    logger.warning(f"Empty configuration file at {config_path}, using defaults")
+                    config_data = {}
+                
+                return cls(**config_data)
+            except (yaml.YAMLError, ValidationError) as e:
+                logger.error(f"Invalid configuration file at {config_path}: {e}")
+                logger.info("Creating backup and using default configuration")
+                
+                # Backup invalid config
+                backup_path = config_path.with_suffix('.yaml.backup')
+                config_path.rename(backup_path)
+                logger.info(f"Invalid config backed up to {backup_path}")
+                
+                # Create default config
+                config = cls()
+                config.save_config(config_path)
+                return config
+            except Exception as e:
+                logger.error(f"Error reading configuration file {config_path}: {e}")
+                logger.info("Using default configuration")
+                return cls()
         else:
             # Create default config
+            logger.info(f"No configuration file found, creating default at {config_path}")
             config = cls()
-            config.save_config(config_path)
+            try:
+                config.save_config(config_path)
+            except Exception as e:
+                logger.warning(f"Could not save default configuration: {e}")
             return config
     
     def save_config(self, config_path: Optional[Path] = None) -> None:
@@ -53,11 +84,20 @@ class Config(BaseModel):
         if config_path is None:
             config_path = self.get_default_config_path()
         
-        # Ensure directory exists
-        config_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        with open(config_path, 'w') as f:
-            yaml.dump(self.model_dump(), f, default_flow_style=False, indent=2)
+        try:
+            # Ensure directory exists
+            config_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            with open(config_path, 'w') as f:
+                yaml.dump(self.model_dump(), f, default_flow_style=False, indent=2)
+            
+            logger.info(f"Configuration saved to {config_path}")
+        except PermissionError:
+            logger.error(f"Permission denied writing to {config_path}")
+            raise
+        except Exception as e:
+            logger.error(f"Error saving configuration to {config_path}: {e}")
+            raise
     
     @staticmethod
     def get_default_config_path() -> Path:

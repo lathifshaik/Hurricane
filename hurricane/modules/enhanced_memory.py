@@ -5,6 +5,7 @@ Provides conversation memory, code understanding, and pattern learning capabilit
 
 import json
 import hashlib
+import logging
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass, asdict
@@ -18,6 +19,9 @@ from rich.panel import Panel
 
 from ..core.config import Config
 from ..core.ollama_client import OllamaClient
+
+# Set up logging
+logger = logging.getLogger(__name__)
 
 console = Console()
 

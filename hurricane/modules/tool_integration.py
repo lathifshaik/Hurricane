@@ -47,9 +47,15 @@ class ToolIntegration:
         # Tool availability cache
         self.available_tools = {}
         self.tool_configs = {}
+        self._tools_checked = False
         
-        # Initialize tool availability
-        asyncio.create_task(self._check_tool_availability())
+        # Initialize tool availability will be done lazily when needed
+    
+    async def _ensure_tools_checked(self):
+        """Ensure tools have been checked (lazy initialization)."""
+        if not self._tools_checked:
+            await self._check_tool_availability()
+            self._tools_checked = True
     
     async def _check_tool_availability(self):
         """Check which tools are available in the system."""
@@ -83,6 +89,7 @@ class ToolIntegration:
         start_time = datetime.now()
         cwd = cwd or self.project_root
         
+        process = None
         try:
             if capture_output:
                 process = await asyncio.create_subprocess_shell(
@@ -92,9 +99,19 @@ class ToolIntegration:
                     stderr=asyncio.subprocess.PIPE
                 )
                 
-                stdout, stderr = await asyncio.wait_for(
-                    process.communicate(), timeout=timeout
-                )
+                try:
+                    stdout, stderr = await asyncio.wait_for(
+                        process.communicate(), timeout=timeout
+                    )
+                except asyncio.TimeoutError:
+                    # Cleanup on timeout
+                    if process:
+                        process.terminate()
+                        try:
+                            await asyncio.wait_for(process.wait(), timeout=5)
+                        except asyncio.TimeoutError:
+                            process.kill()
+                    raise
                 
                 output = stdout.decode('utf-8') if stdout else ""
                 error = stderr.decode('utf-8') if stderr else ""

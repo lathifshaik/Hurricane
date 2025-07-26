@@ -5,16 +5,20 @@ Project indexing and navigation module for Hurricane AI Agent.
 import os
 import ast
 import json
+import logging
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Set
-from datetime import datetime
+from datetime import datetime, timedelta
 import hashlib
+from functools import lru_cache
 from rich.console import Console
 from rich.tree import Tree
 from rich.table import Table
 from rich.panel import Panel
 from rich.prompt import Prompt, Confirm
 
+# Set up logging
+logger = logging.getLogger(__name__)
 console = Console()
 
 
@@ -26,6 +30,11 @@ class ProjectIndexer:
         self.index_file = self.project_root / ".hurricane" / "project_index.json"
         self.index_data = {}
         self.file_cache = {}
+        
+        # Performance optimization
+        self._cache_expiry = timedelta(minutes=30)  # Cache expires after 30 minutes
+        self._last_index_time = None
+        self._analysis_cache = {}  # Cache for file analysis results
         
         # Supported file types for analysis
         self.code_extensions = {

@@ -13,6 +13,17 @@ asyncio-mqtt>=0.16.1
 aiofiles>=23.2.1
 typer>=0.9.0
 colorama>=0.4.6
-# New dependencies for enhanced features
+
+# Enhanced features dependencies
 aiohttp>=3.9.0
 beautifulsoup4>=4.12.0
+
+# Agentic features dependencies
+watchdog>=3.0.0
+scikit-learn>=1.3.0
+numpy>=1.24.0
+psutil>=5.9.0
+gitpython>=3.1.40
+requests>=2.31.0
+fuzzy>=1.2.2
+textdistance>=4.6.0
