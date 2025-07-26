@@ -1,0 +1,13 @@
+ollama:
+  host: "http://localhost:11434"
+  model: "codellama"
+  timeout: 30
+  temperature: 0.7
+  max_tokens: 2048
+
+preferences:
+  code_style: "clean"
+  documentation_format: "markdown"
+  file_organization: "by_type"
+  auto_save: true
+  verbose: false
