@@ -19,6 +19,8 @@ import time
 from .core.agent import HurricaneAgent
 from .core.config import Config
 from .modules.project_indexer import ProjectIndexer
+from .modules.context_aware_editor import ContextAwareEditor
+from .modules.project_planner import ProjectPlanner
 
 console = Console()
 
@@ -203,13 +205,17 @@ def show_help_examples():
         "🔍 'Analyze codebase for issues'",
         "🤖 'Select AI model'",
         "⚡ 'Auto-fix code issues'",
-        "📈 'Show code quality metrics'"
-    ]
-    git_patterns = [
-        r"(?:git|version control|commit|push|pull|branch|merge)",
-        r"(?:commit.*changes|add.*files|create.*branch|switch.*branch)",
-        r"(?:git status|git log|git history|commit message)",
-        r"(?:smart commit|auto commit|generate commit message)"
+        "📈 'Show code quality metrics'",
+        "✏️ 'Start smart editing session for main.py'",
+        "🎯 'Edit file with context awareness'",
+        "💡 'Suggest improvements for my code'",
+        "📊 'Show editing progress'",
+        "✅ 'Finish editing session'",
+        "🚀 'Create a React landing page app'",
+        "🎮 'Build a Python game with Pygame'",
+        "🌐 'Generate a Next.js web application'",
+        "📱 'Create a Flutter mobile app'",
+        "🔧 'Build an Express.js API'"
     ]
     console.print("\n[bold green]💡 Here's what I can help you with:[/bold green]")
     
@@ -217,6 +223,50 @@ def show_help_examples():
         console.print(f"  {example}")
     
     console.print("\n[dim]Just describe what you want in plain English![/dim]\n")
+
+# Context-aware editing patterns
+context_editing_patterns = [
+    r'(?i).*\b(edit|modify|change|update)\b.*\b(file|code)\b.*\b(context|smart|intelligent)\b.*',
+    r'(?i).*\b(start|begin)\b.*\b(editing|edit)\b.*\b(session)\b.*',
+    r'(?i).*\b(suggest|recommend)\b.*\b(edit|change|improvement)\b.*',
+    r'(?i).*\b(analyze|review)\b.*\b(file|code)\b.*\b(editing|edit)\b.*',
+    r'(?i).*\b(finish|complete|end)\b.*\b(editing|edit)\b.*\b(session)\b.*',
+    r'(?i).*\b(show|display)\b.*\b(editing|edit)\b.*\b(progress|status)\b.*',
+]
+
+# Git patterns
+git_patterns = [
+    r'(?i).*\b(git|version control|commit|push|pull|branch|merge)\b.*',
+    r'(?i).*\b(commit.*changes|add.*files|create.*branch|switch.*branch)\b.*',
+    r'(?i).*\b(git status|git log|git history|commit message)\b.*',
+    r'(?i).*\b(smart commit|auto commit|generate commit message)\b.*'
+]
+
+# Codebase analysis patterns
+codebase_analysis_patterns = [
+    r'(?i).*\b(analyze|analysis|check|review|audit)\b.*\b(codebase|code|project)\b.*',
+    r'(?i).*\b(optimize|optimization|improve|enhancement)\b.*\b(suggestions?|opportunities)\b.*',
+    r'(?i).*\b(quality|metrics|score|debt)\b.*\b(code|technical)\b.*',
+    r'(?i).*\b(auto.?fix|fix.?issues|fix.?problems)\b.*',
+]
+
+# Model selection patterns
+model_selection_patterns = [
+    r'(?i).*\b(select|choose|pick|change)\b.*\b(model|ai)\b.*',
+    r'(?i).*\b(install|setup|configure)\b.*\b(model|ai)\b.*',
+    r'(?i).*\b(recommend|suggest|best)\b.*\b(model|ai)\b.*',
+    r'(?i).*\b(show|list|display)\b.*\b(models?|installed)\b.*',
+]
+
+# App generation patterns
+app_generation_patterns = [
+    r'(?i).*\b(create|build|generate|make)\b.*\b(app|application|project)\b.*',
+    r'(?i).*\b(landing page|website|web app|web application)\b.*',
+    r'(?i).*\b(game|pygame|python game)\b.*',
+    r'(?i).*\b(mobile app|flutter|android|ios)\b.*',
+    r'(?i).*\b(api|backend|express|rest api)\b.*',
+    r'(?i).*\b(react|nextjs|next.js|vue|angular)\b.*\b(app|application)\b.*',
+]
 
 async def process_natural_language_request(agent: HurricaneAgent, user_input: str, indexer: ProjectIndexer):
     """Process natural language requests and determine what action to take."""
@@ -228,15 +278,19 @@ async def process_natural_language_request(agent: HurricaneAgent, user_input: st
             await handle_navigation_request(agent, user_input, indexer)
         elif any(word in user_input_lower for word in ['find', 'search', 'locate', 'where']):
             await handle_search_request(agent, user_input, indexer)
+        elif any(re.search(pattern, user_input, re.IGNORECASE) for pattern in app_generation_patterns):
+            await handle_app_generation_request(agent, user_input, indexer)
+        elif any(re.search(pattern, user_input, re.IGNORECASE) for pattern in context_editing_patterns):
+            await handle_context_editing_request(agent, user_input, indexer)
         elif any(re.search(pattern, user_input, re.IGNORECASE) for pattern in git_patterns):
             await handle_git_request(agent, user_input, indexer)
-        elif any(word in user_input_lower for word in ['analyze', 'analysis', 'code quality', 'issues', 'metrics']):
+        elif any(word in user_input_lower for word in ['web', 'search', 'documentation', 'docs', 'lookup']):
+            await handle_web_search_request(agent, user_input)
+        elif any(re.search(pattern, user_input, re.IGNORECASE) for pattern in codebase_analysis_patterns):
             await handle_codebase_analysis_request(agent, user_input, indexer)
-        elif any(word in user_input_lower for word in ['model', 'select model', 'change model', 'ai model']):
+        elif any(re.search(pattern, user_input, re.IGNORECASE) for pattern in model_selection_patterns):
             await handle_model_selection_request(agent, user_input)
-        elif any(word in user_input_lower for word in ['navigate', 'go to', 'open', 'cd']):
-            await handle_file_navigation_request(agent, user_input, indexer)
-        elif any(word in user_input_lower for word in ['fix', 'bug', 'error', 'debug', 'broken']):
+        elif any(word in user_input_lower for word in ['debug', 'fix', 'error', 'bug']):
             await handle_debug_request(agent, user_input, indexer)
         elif any(word in user_input_lower for word in ['create', 'generate', 'make', 'build', 'write', 'new']):
             await handle_create_request(agent, user_input, indexer)
@@ -805,6 +859,177 @@ async def handle_model_selection_request(agent: HurricaneAgent, user_input: str)
     
     except Exception as e:
         console.print(f"[red]❌ Model selection error: {e}[/red]")
+
+async def handle_context_editing_request(agent: HurricaneAgent, user_input: str, indexer: ProjectIndexer):
+    """Handle context-aware editing requests."""
+    console.print("[blue]✏️ I'll help you with context-aware editing![/blue]")
+    user_input_lower = user_input.lower()
+    
+    try:
+        # Initialize project planner and context-aware editor
+        project_planner = ProjectPlanner(agent.ollama_client, agent.config, agent.project_root)
+        context_editor = ContextAwareEditor(agent.ollama_client, agent.config, project_planner)
+        
+        if any(word in user_input_lower for word in ['start', 'begin', 'session']):
+            # Start editing session
+            file_path = None
+            # Try to extract file path from input
+            words = user_input.split()
+            for word in words:
+                if '.' in word and ('/' in word or word.endswith(('.py', '.js', '.ts', '.go', '.rs', '.java', '.cpp', '.c', '.h'))):
+                    file_path = word
+                    break
+            
+            if not file_path:
+                file_path = Prompt.ask("Enter the file path to edit")
+            
+            task_description = Prompt.ask("What would you like to accomplish with this file?", default="General editing")
+            
+            # Start editing session
+            edit_context = await context_editor.start_editing_session(file_path, task_description)
+            
+            # Analyze file and show suggestions
+            suggestions = await context_editor.analyze_file_for_editing(file_path, task_description)
+            if suggestions:
+                console.print("\n[bold cyan]💡 AI Suggestions:[/bold cyan]")
+                for i, suggestion in enumerate(suggestions, 1):
+                    console.print(f"{i}. Line {suggestion.line_number}: {suggestion.reason}")
+                    if suggestion.requires_research:
+                        console.print(f"   [dim]Research performed: {suggestion.research_query}[/dim]")
+        
+        elif any(word in user_input_lower for word in ['suggest', 'recommend', 'improvement']):
+            # Get editing suggestions for current context
+            file_path = Prompt.ask("Enter the file path to analyze")
+            edit_goal = Prompt.ask("What's your editing goal?", default="General improvements")
+            
+            suggestions = await context_editor.analyze_file_for_editing(file_path, edit_goal)
+            if suggestions:
+                console.print("\n[bold green]🎯 Context-Aware Suggestions:[/bold green]")
+                for i, suggestion in enumerate(suggestions, 1):
+                    console.print(f"\n{i}. [bold]Line {suggestion.line_number}[/bold]")
+                    console.print(f"   [yellow]Current:[/yellow] {suggestion.original_code}")
+                    console.print(f"   [green]Suggested:[/green] {suggestion.suggested_code}")
+                    console.print(f"   [blue]Reason:[/blue] {suggestion.reason}")
+                    console.print(f"   [dim]Confidence: {suggestion.confidence:.1%}[/dim]")
+        
+        elif any(word in user_input_lower for word in ['edit', 'modify', 'change', 'update']):
+            # Apply context-aware edit
+            file_path = None
+            # Try to extract file path from input
+            words = user_input.split()
+            for word in words:
+                if '.' in word and ('/' in word or word.endswith(('.py', '.js', '.ts', '.go', '.rs', '.java', '.cpp', '.c', '.h'))):
+                    file_path = word
+                    break
+            
+            if not file_path:
+                file_path = Prompt.ask("Enter the file path to edit")
+            
+            edit_description = Prompt.ask("Describe the edit you want to make")
+            
+            success = await context_editor.apply_edit_with_context(file_path, edit_description, context_aware=True)
+            if success:
+                # Suggest next edit
+                next_suggestion = await context_editor.suggest_next_edit(file_path)
+                if next_suggestion:
+                    console.print(f"\n[bold blue]💡 Next suggestion:[/bold blue] {next_suggestion}")
+        
+        elif any(word in user_input_lower for word in ['progress', 'status']):
+            # Show editing progress
+            context_editor.show_editing_progress()
+        
+        elif any(word in user_input_lower for word in ['finish', 'complete', 'end']):
+            # Finish editing session
+            completion_notes = Prompt.ask("Any completion notes?", default="")
+            await context_editor.finish_editing_session(completion_notes)
+        
+        else:
+            # General context-aware editing help
+            console.print("[bold cyan]🎯 Context-Aware Editing Options:[/bold cyan]")
+            console.print("• 'Start editing session for main.py' - Begin context-aware editing")
+            console.print("• 'Suggest improvements for my code' - Get AI suggestions")
+            console.print("• 'Edit file with context' - Apply context-aware edits")
+            console.print("• 'Show editing progress' - View current session status")
+            console.print("• 'Finish editing session' - Complete and save session")
+    
+    except Exception as e:
+        console.print(f"[red]❌ Context editing error: {e}[/red]")
+
+async def handle_app_generation_request(agent: HurricaneAgent, user_input: str, indexer: ProjectIndexer):
+    """Handle app generation requests."""
+    console.print("[blue]🚀 I'll help you create a complete application![/blue]")
+    user_input_lower = user_input.lower()
+    
+    try:
+        if any(word in user_input_lower for word in ['list', 'show', 'available', 'templates']):
+            # Show available app templates
+            agent.app_generator.list_available_templates()
+            return
+        
+        # Check if user wants to specify app name
+        app_name = None
+        if "called" in user_input_lower or "named" in user_input_lower:
+            # Try to extract app name from input
+            words = user_input.split()
+            for i, word in enumerate(words):
+                if word.lower() in ['called', 'named'] and i + 1 < len(words):
+                    app_name = words[i + 1].strip('"\'')
+                    break
+        
+        # Detect app type from request
+        app_type = await agent.app_generator.detect_app_type(user_input)
+        
+        if not app_type:
+            console.print("[yellow]⚠️ Could not determine app type from your request.[/yellow]")
+            console.print("[blue]Available app types:[/blue]")
+            agent.app_generator.list_available_templates()
+            
+            app_type = Prompt.ask(
+                "\nWhich type of app would you like to create?",
+                choices=list(agent.app_generator.templates.keys()),
+                default="react_landing"
+            )
+        
+        # Get app name if not provided
+        if not app_name:
+            suggested_name = await agent.app_generator._generate_app_name(user_input, agent.app_generator.templates[app_type])
+            app_name = Prompt.ask(f"App name", default=suggested_name)
+        
+        # Confirm before creating
+        template = agent.app_generator.templates[app_type]
+        console.print(f"\n[bold cyan]📋 App Generation Summary:[/bold cyan]")
+        console.print(f"[bold]Name:[/bold] {app_name}")
+        console.print(f"[bold]Type:[/bold] {template.name}")
+        console.print(f"[bold]Description:[/bold] {template.description}")
+        console.print(f"[bold]Tech Stack:[/bold] {', '.join(template.tech_stack)}")
+        console.print(f"[bold]Files to Generate:[/bold] {len(template.required_files)}")
+        
+        if not Confirm.ask("\nProceed with app generation?"):
+            console.print("[yellow]App generation cancelled.[/yellow]")
+            return
+        
+        # Create the app
+        console.print(f"\n[bold green]🎯 Creating {template.name}: '{app_name}'[/bold green]")
+        app_path = await agent.app_generator.create_app(user_input, app_name, app_type)
+        
+        if app_path:
+            console.print(f"\n[bold green]✅ Successfully created '{app_name}' at {app_path}![/bold green]")
+            
+            # Ask if user wants to open the directory
+            if Confirm.ask("Would you like to navigate to the new app directory?"):
+                os.chdir(app_path)
+                console.print(f"[green]📁 Changed directory to {app_path}[/green]")
+                
+                # Update the agent's project root
+                agent.project_root = app_path
+                agent.project_indexer = ProjectIndexer(app_path)
+                
+                console.print("[blue]💡 You can now use Hurricane commands within your new app![/blue]")
+        else:
+            console.print("[red]❌ App generation failed.[/red]")
+    
+    except Exception as e:
+        console.print(f"[red]❌ App generation error: {e}[/red]")
 
 async def handle_web_search_request(agent: HurricaneAgent, user_input: str, language: str = None):
     """Handle web search for documentation requests."""
