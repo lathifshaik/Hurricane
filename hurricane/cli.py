@@ -18,6 +18,7 @@ import time
 
 from .core.agent import HurricaneAgent
 from .core.config import Config
+from .modules.project_indexer import ProjectIndexer
 
 console = Console()
 
@@ -185,11 +186,15 @@ def show_help_examples():
         "🚀 'Generate a FastAPI server with user authentication'",
         "🐛 'Debug the error in my Python code'",
         "📚 'Add comments to my functions'",
-        "🏗️ 'Create a new React component for login'",
+        "🏗️ 'Create a new file called utils.py'",
         "♻️ 'Refactor this code to be cleaner'",
         "📖 'Explain what this code does'",
         "🧪 'Generate unit tests for my functions'",
-        "📁 'Organize my project files'"
+        "📁 'Show project structure'",
+        "🔍 'Find files with login'",
+        "🧭 'Navigate to main.py'",
+        "⚠️ 'Delete old_file.py'",
+        "📊 'Show project summary'"
     ]
     
     console.print("\n[bold green]💡 Here's what I can help you with:[/bold green]")
@@ -199,35 +204,236 @@ def show_help_examples():
     
     console.print("\n[dim]Just describe what you want in plain English![/dim]\n")
 
-async def process_natural_language_request(agent: HurricaneAgent, user_input: str):
+async def process_natural_language_request(agent: HurricaneAgent, user_input: str, indexer: ProjectIndexer):
     """Process natural language requests and determine what action to take."""
     user_input_lower = user_input.lower()
     
     try:
         # Determine intent based on keywords
-        if any(word in user_input_lower for word in ['fix', 'bug', 'error', 'debug', 'broken']):
-            await handle_debug_request(agent, user_input)
-        elif any(word in user_input_lower for word in ['create', 'generate', 'make', 'build', 'write']):
-            await handle_create_request(agent, user_input)
+        if any(word in user_input_lower for word in ['show', 'display', 'tree', 'structure', 'project']):
+            await handle_navigation_request(agent, user_input, indexer)
+        elif any(word in user_input_lower for word in ['find', 'search', 'locate', 'where']):
+            await handle_search_request(agent, user_input, indexer)
+        elif any(word in user_input_lower for word in ['delete', 'remove', 'rm']):
+            await handle_delete_request(agent, user_input, indexer)
+        elif any(word in user_input_lower for word in ['navigate', 'go to', 'open', 'cd']):
+            await handle_file_navigation_request(agent, user_input, indexer)
+        elif any(word in user_input_lower for word in ['fix', 'bug', 'error', 'debug', 'broken']):
+            await handle_debug_request(agent, user_input, indexer)
+        elif any(word in user_input_lower for word in ['create', 'generate', 'make', 'build', 'write', 'new']):
+            await handle_create_request(agent, user_input, indexer)
         elif any(word in user_input_lower for word in ['readme', 'documentation', 'docs', 'comment']):
-            await handle_documentation_request(agent, user_input)
+            await handle_documentation_request(agent, user_input, indexer)
         elif any(word in user_input_lower for word in ['refactor', 'clean', 'improve', 'optimize']):
-            await handle_refactor_request(agent, user_input)
+            await handle_refactor_request(agent, user_input, indexer)
         elif any(word in user_input_lower for word in ['explain', 'what does', 'how does', 'understand']):
-            await handle_explain_request(agent, user_input)
+            await handle_explain_request(agent, user_input, indexer)
         elif any(word in user_input_lower for word in ['test', 'unit test', 'testing']):
-            await handle_test_request(agent, user_input)
+            await handle_test_request(agent, user_input, indexer)
         elif any(word in user_input_lower for word in ['organize', 'structure', 'files']):
-            await handle_file_organization_request(agent, user_input)
+            await handle_file_organization_request(agent, user_input, indexer)
         else:
             # General code generation
-            await handle_general_request(agent, user_input)
+            await handle_general_request(agent, user_input, indexer)
             
     except Exception as e:
         console.print(f"[red]❌ Sorry, I encountered an error: {e}[/red]")
         console.print("[yellow]💡 Try rephrasing your request or type 'help' for examples.[/yellow]")
 
-async def handle_debug_request(agent: HurricaneAgent, user_input: str):
+async def handle_navigation_request(agent: HurricaneAgent, user_input: str, indexer: ProjectIndexer):
+    """Handle project navigation and structure display requests."""
+    console.print("[blue]🗂️ I'll show you the project structure![/blue]")
+    
+    if "summary" in user_input.lower() or "stats" in user_input.lower():
+        # Show project summary
+        summary = indexer.get_project_summary()
+        
+        table = Table(title="📊 Project Summary")
+        table.add_column("Metric", style="cyan")
+        table.add_column("Count", style="green")
+        
+        table.add_row("Total Files", str(summary["total_files"]))
+        table.add_row("Functions", str(summary["total_functions"]))
+        table.add_row("Classes", str(summary["total_classes"]))
+        
+        for file_type, count in summary["by_type"].items():
+            table.add_row(f"{file_type.title()} Files", str(count))
+        
+        console.print(table)
+        
+        if summary["by_language"]:
+            lang_table = Table(title="🔤 Languages Used")
+            lang_table.add_column("Language", style="cyan")
+            lang_table.add_column("Files", style="green")
+            
+            for lang, count in summary["by_language"].items():
+                lang_table.add_row(lang.title(), str(count))
+            
+            console.print(lang_table)
+    else:
+        # Show project tree
+        depth = 3
+        if "deep" in user_input.lower() or "detailed" in user_input.lower():
+            depth = 5
+        elif "shallow" in user_input.lower() or "brief" in user_input.lower():
+            depth = 2
+        
+        indexer.show_project_tree(max_depth=depth)
+
+async def handle_search_request(agent: HurricaneAgent, user_input: str, indexer: ProjectIndexer):
+    """Handle file search requests."""
+    console.print("[blue]🔍 I'll help you find files![/blue]")
+    
+    # Extract search query
+    search_terms = ["find", "search", "locate", "where", "files", "with", "containing"]
+    words = user_input.lower().split()
+    
+    # Find the actual search query
+    query = ""
+    for i, word in enumerate(words):
+        if word in search_terms and i + 1 < len(words):
+            query = " ".join(words[i+1:])
+            break
+    
+    if not query:
+        query = Prompt.ask("What would you like to search for?")
+    
+    # Determine file type filter
+    file_type = None
+    if "code" in user_input.lower() or "python" in user_input.lower():
+        file_type = "code"
+    elif "doc" in user_input.lower() or "readme" in user_input.lower():
+        file_type = "documentation"
+    
+    results = indexer.search_files(query, file_type)
+    
+    if not results:
+        console.print(f"[yellow]No files found matching '{query}'[/yellow]")
+        return
+    
+    console.print(f"[green]Found {len(results)} files matching '{query}':[/green]\n")
+    
+    for result in results[:10]:  # Show top 10 results
+        path = result["path"]
+        match_type = result["match_type"]
+        info = result["info"]
+        
+        if match_type == "filename":
+            console.print(f"📄 [cyan]{path}[/cyan] - {info.get('summary', 'File match')}")
+        elif match_type == "function":
+            console.print(f"🔧 [cyan]{path}[/cyan] - Function: [yellow]{result['match_name']}[/yellow] (line {result['line']})")
+        elif match_type == "class":
+            console.print(f"🏗️ [cyan]{path}[/cyan] - Class: [yellow]{result['match_name']}[/yellow] (line {result['line']})")
+    
+    if len(results) > 10:
+        console.print(f"\n[dim]... and {len(results) - 10} more results[/dim]")
+
+async def handle_delete_request(agent: HurricaneAgent, user_input: str, indexer: ProjectIndexer):
+    """Handle file deletion requests with safety checks."""
+    console.print("[yellow]⚠️ I'll help you safely delete files![/yellow]")
+    
+    # Extract filename from request
+    words = user_input.split()
+    filename = None
+    
+    for i, word in enumerate(words):
+        if word.lower() in ["delete", "remove", "rm"] and i + 1 < len(words):
+            filename = words[i + 1]
+            break
+    
+    if not filename:
+        filename = Prompt.ask("Which file would you like to delete?")
+    
+    # Search for the file if not exact path
+    if not Path(filename).exists():
+        search_results = indexer.search_files(filename)
+        
+        if not search_results:
+            console.print(f"[red]❌ File '{filename}' not found[/red]")
+            return
+        
+        if len(search_results) == 1:
+            filename = search_results[0]["path"]
+        else:
+            console.print("[yellow]Multiple files found:[/yellow]")
+            choices = []
+            for i, result in enumerate(search_results[:5]):
+                console.print(f"  {i+1}. {result['path']}")
+                choices.append(str(i+1))
+            
+            choice = Prompt.ask("Which file?", choices=choices + ["cancel"])
+            if choice == "cancel":
+                return
+            
+            filename = search_results[int(choice) - 1]["path"]
+    
+    # Perform safe deletion
+    await indexer.safe_delete_file(filename)
+
+async def handle_file_navigation_request(agent: HurricaneAgent, user_input: str, indexer: ProjectIndexer):
+    """Handle file navigation requests."""
+    console.print("[blue]🧭 I'll help you navigate to files![/blue]")
+    
+    # Extract filename from request
+    words = user_input.split()
+    filename = None
+    
+    for i, word in enumerate(words):
+        if word.lower() in ["navigate", "go", "open", "cd"] and i + 1 < len(words):
+            filename = " ".join(words[i + 1:])
+            break
+    
+    if not filename:
+        filename = Prompt.ask("Which file would you like to navigate to?")
+    
+    # Search for the file
+    search_results = indexer.search_files(filename)
+    
+    if not search_results:
+        console.print(f"[red]❌ File '{filename}' not found[/red]")
+        return
+    
+    if len(search_results) == 1:
+        target_file = search_results[0]["path"]
+    else:
+        console.print("[yellow]Multiple files found:[/yellow]")
+        choices = []
+        for i, result in enumerate(search_results[:5]):
+            console.print(f"  {i+1}. {result['path']}")
+            choices.append(str(i+1))
+        
+        choice = Prompt.ask("Which file?", choices=choices + ["cancel"])
+        if choice == "cancel":
+            return
+        
+        target_file = search_results[int(choice) - 1]["path"]
+    
+    # Navigate to file and show context
+    context = indexer.navigate_to_file(target_file)
+    
+    if not context:
+        console.print(f"[red]❌ Could not navigate to {target_file}[/red]")
+        return
+    
+    console.print(Panel(
+        f"""[bold cyan]File:[/bold cyan] {context['path']}
+[bold cyan]Full Path:[/bold cyan] {context['full_path']}
+[bold cyan]Exists:[/bold cyan] {'✅ Yes' if context['exists'] else '❌ No'}
+[bold cyan]Type:[/bold cyan] {context['info'].get('type', 'unknown')}
+[bold cyan]Language:[/bold cyan] {context['info'].get('language', 'unknown')}
+[bold cyan]Size:[/bold cyan] {context['info'].get('size', 0)} bytes
+[bold cyan]Summary:[/bold cyan] {context['info'].get('summary', 'No summary')}""",
+        title=f"📄 {Path(target_file).name}",
+        border_style="blue"
+    ))
+    
+    # Show related files
+    if context['related_files']:
+        console.print("\n[bold green]🔗 Related Files:[/bold green]")
+        for related in context['related_files'][:5]:
+            console.print(f"  📄 {related}")
+
+async def handle_debug_request(agent: HurricaneAgent, user_input: str, indexer: ProjectIndexer = None):
     """Handle debugging requests."""
     console.print("[blue]🐛 I'll help you debug your code![/blue]")
     
@@ -258,9 +464,21 @@ async def handle_debug_request(agent: HurricaneAgent, user_input: str):
         # Handle direct code input
         console.print("[dim]Direct code debugging not implemented yet. Please specify a file.[/dim]")
 
-async def handle_create_request(agent: HurricaneAgent, user_input: str):
+async def handle_create_request(agent: HurricaneAgent, user_input: str, indexer: ProjectIndexer = None):
     """Handle code creation requests."""
     console.print("[blue]🔧 I'll help you create some code![/blue]")
+    
+    # Check if user wants to create a new file
+    if "new file" in user_input.lower() or "create file" in user_input.lower():
+        filename = Prompt.ask("What should I name the new file?")
+        
+        if indexer:
+            success = await indexer.create_file_with_template(filename)
+            if success:
+                show_file_changes({filename: {"description": "Created new file with template"}})
+            return
+        else:
+            console.print("[yellow]File creation requires project indexing. Use 'hurricane start' for full features.[/yellow]")
     
     # Detect language
     language = "python"  # default
@@ -288,7 +506,7 @@ async def handle_create_request(agent: HurricaneAgent, user_input: str):
         await agent.file_manager.save_file(Path(filename), code)
         show_file_changes({filename: {"description": "Created new file with generated code"}})
 
-async def handle_documentation_request(agent: HurricaneAgent, user_input: str):
+async def handle_documentation_request(agent: HurricaneAgent, user_input: str, indexer: ProjectIndexer = None):
     """Handle documentation requests."""
     console.print("[blue]📝 I'll help you create documentation![/blue]")
     
@@ -319,7 +537,7 @@ async def handle_documentation_request(agent: HurricaneAgent, user_input: str):
         await agent.file_manager.save_file(Path(filename), documentation)
         show_file_changes({filename: {"description": f"Created {doc_type} documentation"}})
 
-async def handle_refactor_request(agent: HurricaneAgent, user_input: str):
+async def handle_refactor_request(agent: HurricaneAgent, user_input: str, indexer: ProjectIndexer = None):
     """Handle code refactoring requests."""
     console.print("[blue]♻️ I'll help you refactor your code![/blue]")
     
@@ -349,7 +567,7 @@ async def handle_refactor_request(agent: HurricaneAgent, user_input: str):
         await agent.file_manager.save_file(Path(file_path), refactored_code)
         show_file_changes({file_path: {"description": f"Refactored with {style} style"}})
 
-async def handle_explain_request(agent: HurricaneAgent, user_input: str):
+async def handle_explain_request(agent: HurricaneAgent, user_input: str, indexer: ProjectIndexer = None):
     """Handle code explanation requests."""
     console.print("[blue]🤔 I'll explain the code for you![/blue]")
     
@@ -371,7 +589,7 @@ async def handle_explain_request(agent: HurricaneAgent, user_input: str):
         border_style="cyan"
     ))
 
-async def handle_test_request(agent: HurricaneAgent, user_input: str):
+async def handle_test_request(agent: HurricaneAgent, user_input: str, indexer: ProjectIndexer = None):
     """Handle test generation requests."""
     console.print("[blue]🧪 I'll generate tests for your code![/blue]")
     
@@ -398,7 +616,7 @@ async def handle_test_request(agent: HurricaneAgent, user_input: str):
         await agent.file_manager.save_file(Path(test_filename), tests)
         show_file_changes({test_filename: {"description": "Created unit tests"}})
 
-async def handle_file_organization_request(agent: HurricaneAgent, user_input: str):
+async def handle_file_organization_request(agent: HurricaneAgent, user_input: str, indexer: ProjectIndexer = None):
     """Handle file organization requests."""
     console.print("[blue]🗂️ I'll help you organize your files![/blue]")
     
@@ -429,7 +647,7 @@ async def handle_file_organization_request(agent: HurricaneAgent, user_input: st
     else:
         console.print(f"[red]❌ Error: {result['error']}[/red]")
 
-async def handle_general_request(agent: HurricaneAgent, user_input: str):
+async def handle_general_request(agent: HurricaneAgent, user_input: str, indexer: ProjectIndexer = None):
     """Handle general requests."""
     console.print("[blue]🤖 I'll help you with that![/blue]")
     
@@ -492,8 +710,14 @@ def start(ctx):
         # Initialize agent
         await agent.initialize()
         
-        console.print("\n[bold green]🎉 Hurricane is ready! Let's start coding![/bold green]")
-        console.print("[dim]Type your request in plain English, and I'll help you with your code.[/dim]\n")
+        # Initialize project indexer
+        current_dir = Path.cwd()
+        indexer = ProjectIndexer(current_dir)
+        project_info = await indexer.initialize_project()
+        
+        console.print(f"\n[bold green]🎉 Hurricane is ready! Indexed {project_info['total_files']} files![/bold green]")
+        console.print("[dim]Type your request in plain English, and I'll help you with your code.[/dim]")
+        console.print("[dim]Try: 'show project structure', 'find files with login', 'create new file', etc.[/dim]\n")
         
         # Main interactive loop
         while True:
@@ -513,7 +737,7 @@ def start(ctx):
                     continue
                 
                 # Process the request
-                await process_natural_language_request(agent, user_input)
+                await process_natural_language_request(agent, user_input, indexer)
                 
             except KeyboardInterrupt:
                 console.print("\n[bold blue]👋 Thanks for using Hurricane! Happy coding![/bold blue]")
