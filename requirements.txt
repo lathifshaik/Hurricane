@@ -13,3 +13,6 @@ asyncio-mqtt>=0.16.1
 aiofiles>=23.2.1
 typer>=0.9.0
 colorama>=0.4.6
+# New dependencies for enhanced features
+aiohttp>=3.9.0
+beautifulsoup4>=4.12.0

@@ -14,6 +14,12 @@ from .ollama_client import OllamaClient
 from ..modules.code_assistant import CodeAssistant
 from ..modules.documentation import DocumentationGenerator
 from ..modules.file_manager import FileManager
+from ..modules.project_indexer import ProjectIndexer
+from ..modules.git_assistant import GitAssistant
+from ..modules.web_search import WebSearchAssistant
+from ..modules.language_support import MultiLanguageSupport
+from ..modules.codebase_analyzer import CodebaseAnalyzer
+from ..modules.model_selector import ModelSelector
 
 console = Console()
 
@@ -26,10 +32,19 @@ class HurricaneAgent:
         self.config = Config.load_config(config_path)
         self.ollama_client = OllamaClient(self.config)
         
+        # Set project root to current working directory
+        self.project_root = Path.cwd()
+        
         # Initialize modules
         self.code_assistant = CodeAssistant(self.ollama_client, self.config)
         self.documentation_generator = DocumentationGenerator(self.ollama_client, self.config)
         self.file_manager = FileManager(self.config)
+        self.project_indexer = ProjectIndexer(self.project_root)
+        self.git_assistant = GitAssistant(self.ollama_client, self.config, self.project_root)
+        self.web_search = WebSearchAssistant(self.ollama_client, self.config)
+        self.language_support = MultiLanguageSupport()
+        self.codebase_analyzer = CodebaseAnalyzer(self.ollama_client, self.config, self.project_root)
+        self.model_selector = ModelSelector(self.ollama_client, self.config)
         
         self._initialized = False
     

@@ -194,9 +194,23 @@ def show_help_examples():
         "🔍 'Find files with login'",
         "🧭 'Navigate to main.py'",
         "⚠️ 'Delete old_file.py'",
-        "📊 'Show project summary'"
+        "📊 'Show project summary'",
+        "💻 'Commit changes with a message'",
+        "📈 'Push changes to GitHub'",
+        "🔄 'Pull changes from GitHub'",
+        "📦 'Create a new branch'",
+        "🔄 'Merge branch into main'",
+        "🔍 'Analyze codebase for issues'",
+        "🤖 'Select AI model'",
+        "⚡ 'Auto-fix code issues'",
+        "📈 'Show code quality metrics'"
     ]
-    
+    git_patterns = [
+        r"(?:git|version control|commit|push|pull|branch|merge)",
+        r"(?:commit.*changes|add.*files|create.*branch|switch.*branch)",
+        r"(?:git status|git log|git history|commit message)",
+        r"(?:smart commit|auto commit|generate commit message)"
+    ]
     console.print("\n[bold green]💡 Here's what I can help you with:[/bold green]")
     
     for example in examples:
@@ -214,8 +228,12 @@ async def process_natural_language_request(agent: HurricaneAgent, user_input: st
             await handle_navigation_request(agent, user_input, indexer)
         elif any(word in user_input_lower for word in ['find', 'search', 'locate', 'where']):
             await handle_search_request(agent, user_input, indexer)
-        elif any(word in user_input_lower for word in ['delete', 'remove', 'rm']):
-            await handle_delete_request(agent, user_input, indexer)
+        elif any(re.search(pattern, user_input, re.IGNORECASE) for pattern in git_patterns):
+            await handle_git_request(agent, user_input, indexer)
+        elif any(word in user_input_lower for word in ['analyze', 'analysis', 'code quality', 'issues', 'metrics']):
+            await handle_codebase_analysis_request(agent, user_input, indexer)
+        elif any(word in user_input_lower for word in ['model', 'select model', 'change model', 'ai model']):
+            await handle_model_selection_request(agent, user_input)
         elif any(word in user_input_lower for word in ['navigate', 'go to', 'open', 'cd']):
             await handle_file_navigation_request(agent, user_input, indexer)
         elif any(word in user_input_lower for word in ['fix', 'bug', 'error', 'debug', 'broken']):
@@ -647,25 +665,203 @@ async def handle_file_organization_request(agent: HurricaneAgent, user_input: st
     else:
         console.print(f"[red]❌ Error: {result['error']}[/red]")
 
+async def handle_git_request(agent: HurricaneAgent, user_input: str, indexer: ProjectIndexer = None):
+    """Handle Git version control requests."""
+    console.print("[blue]🌿 I'll help you with Git![/blue]")
+    
+    user_input_lower = user_input.lower()
+    
+    try:
+        if any(word in user_input_lower for word in ['status', 'show status']):
+            await agent.git_assistant.show_status()
+        
+        elif any(word in user_input_lower for word in ['commit', 'smart commit']):
+            if 'smart' in user_input_lower or 'auto' in user_input_lower:
+                await agent.git_assistant.smart_commit_workflow()
+            else:
+                # Add all files and commit with AI-generated message
+                await agent.git_assistant.add_files()
+                await agent.git_assistant.commit_changes(auto_message=False)
+        
+        elif any(word in user_input_lower for word in ['history', 'log', 'commits']):
+            await agent.git_assistant.show_commit_history()
+        
+        elif any(word in user_input_lower for word in ['branch', 'branches']):
+            if 'create' in user_input_lower or 'new' in user_input_lower:
+                branch_name = Prompt.ask("Enter branch name")
+                await agent.git_assistant.create_branch(branch_name)
+            elif 'switch' in user_input_lower or 'checkout' in user_input_lower:
+                await agent.git_assistant.show_branches()
+                branch_name = Prompt.ask("Enter branch name to switch to")
+                await agent.git_assistant.switch_branch(branch_name)
+            else:
+                await agent.git_assistant.show_branches()
+        
+        elif any(word in user_input_lower for word in ['init', 'initialize']):
+            await agent.git_assistant.init_repo()
+        
+        else:
+            # Use AI to help with Git command
+            git_help = await agent.ollama_client.generate_response(
+                f"Help with this Git request: {user_input}",
+                system_prompt="You are a Git expert. Provide helpful Git commands and explanations. Be concise and practical."
+            )
+            console.print(Panel(
+                git_help,
+                title="🌿 Git Assistant",
+                border_style="green"
+            ))
+    
+    except Exception as e:
+        console.print(f"[red]❌ Git error: {e}[/red]")
+
+async def handle_codebase_analysis_request(agent: HurricaneAgent, user_input: str, indexer: ProjectIndexer = None):
+    """Handle codebase analysis and optimization requests."""
+    console.print("[blue]🔍 I'll analyze your codebase for optimization opportunities![/blue]")
+    
+    user_input_lower = user_input.lower()
+    
+    try:
+        if any(word in user_input_lower for word in ['auto-fix', 'fix issues', 'auto fix']):
+            # Auto-fix issues
+            console.print("[blue]🔧 Running codebase analysis and auto-fixing issues...[/blue]")
+            analysis_results = await agent.codebase_analyzer.analyze_project(include_ai_suggestions=False)
+            await agent.codebase_analyzer.show_analysis_results(analysis_results)
+            
+            if analysis_results["metrics"]["auto_fixable_issues"] > 0:
+                if Confirm.ask("Auto-fix the fixable issues?"):
+                    fix_results = await agent.codebase_analyzer.auto_fix_issues(analysis_results)
+                    console.print(f"[green]✅ Fixed {fix_results['fixed_count']} issues automatically![/green]")
+        
+        elif any(word in user_input_lower for word in ['metrics', 'quality', 'score']):
+            # Show quality metrics only
+            console.print("[blue]📊 Analyzing code quality metrics...[/blue]")
+            analysis_results = await agent.codebase_analyzer.analyze_project(include_ai_suggestions=False)
+            
+            metrics = analysis_results["metrics"]
+            console.print(Panel(
+                f"[bold]Quality Score:[/bold] {metrics['quality_score']}/100\n"
+                f"[bold]Total Issues:[/bold] {metrics['total_issues']}\n"
+                f"[bold]Technical Debt:[/bold] {metrics['technical_debt_hours']:.1f} hours\n"
+                f"[bold]Auto-fixable:[/bold] {metrics['auto_fixable_issues']} issues",
+                title="📈 Code Quality Metrics",
+                border_style="green" if metrics['quality_score'] >= 80 else "yellow" if metrics['quality_score'] >= 60 else "red"
+            ))
+        
+        else:
+            # Full analysis with AI suggestions
+            console.print("[blue]🤖 Running comprehensive codebase analysis with AI suggestions...[/blue]")
+            analysis_results = await agent.codebase_analyzer.analyze_project(include_ai_suggestions=True)
+            await agent.codebase_analyzer.show_analysis_results(analysis_results)
+            
+            # Offer auto-fix if available
+            if analysis_results["metrics"]["auto_fixable_issues"] > 0:
+                if Confirm.ask("Would you like me to auto-fix the fixable issues?"):
+                    fix_results = await agent.codebase_analyzer.auto_fix_issues(analysis_results)
+                    console.print(f"[green]✅ Fixed {fix_results['fixed_count']} issues automatically![/green]")
+    
+    except Exception as e:
+        console.print(f"[red]❌ Analysis error: {e}[/red]")
+
+async def handle_model_selection_request(agent: HurricaneAgent, user_input: str):
+    """Handle AI model selection and management requests."""
+    console.print("[blue]🤖 I'll help you select the perfect AI model![/blue]")
+    
+    user_input_lower = user_input.lower()
+    
+    try:
+        if any(word in user_input_lower for word in ['installed', 'list', 'show models']):
+            # Show installed models
+            await agent.model_selector.show_installed_models()
+        
+        elif any(word in user_input_lower for word in ['recommend', 'suggestion', 'best']):
+            # Get recommendations based on use case
+            use_case = "general coding"  # Default
+            if "debug" in user_input_lower:
+                use_case = "debugging"
+            elif "document" in user_input_lower:
+                use_case = "documentation"
+            elif "complex" in user_input_lower:
+                use_case = "complex coding"
+            
+            recommendations = agent.model_selector.get_model_recommendations(use_case)
+            
+            console.print(f"[bold green]🎯 Top recommendations for {use_case}:[/bold green]")
+            for i, model in enumerate(recommendations, 1):
+                status = "✅ Installed" if model.installed else "📥 Available"
+                console.print(f"{i}. {model.display_name} - {status}")
+                console.print(f"   {model.description}")
+                console.print(f"   Rating: {model.performance_rating}/5.0 ⭐\n")
+        
+        else:
+            # Show interactive model selector
+            selected_model = await agent.model_selector.show_interactive_selector()
+            
+            if selected_model:
+                console.print(f"[green]🎉 Successfully set up {selected_model}![/green]")
+                console.print("[blue]💡 You can now use Hurricane with your new model![/blue]")
+            else:
+                console.print("[yellow]Model selection cancelled.[/yellow]")
+    
+    except Exception as e:
+        console.print(f"[red]❌ Model selection error: {e}[/red]")
+
+async def handle_web_search_request(agent: HurricaneAgent, user_input: str, language: str = None):
+    """Handle web search for documentation requests."""
+    console.print("[blue]🔍 Searching documentation...[/blue]")
+    
+    try:
+        # Extract search query from user input
+        search_terms = ['search', 'find', 'look up', 'documentation', 'docs', 'how to']
+        query = user_input
+        
+        for term in search_terms:
+            query = query.replace(term, '').strip()
+        
+        # Detect language from context if not provided
+        if not language:
+            language = agent.web_search.get_language_from_context(user_input)
+        
+        # Search and get AI summary
+        async with agent.web_search as search_assistant:
+            summary = await search_assistant.search_and_summarize(query, language)
+            
+            console.print(Panel(
+                summary,
+                title="📚 Documentation Search Results",
+                border_style="cyan"
+            ))
+    
+    except Exception as e:
+        console.print(f"[red]❌ Search error: {e}[/red]")
+
 async def handle_general_request(agent: HurricaneAgent, user_input: str, indexer: ProjectIndexer = None):
     """Handle general requests."""
     console.print("[blue]🤖 I'll help you with that![/blue]")
     
-    # Try to generate code based on the request
-    console.print(f"\n[blue]⚡ Processing your request...[/blue]")
+    # Check if this might be a documentation search request
+    if any(word in user_input.lower() for word in ['how to', 'documentation', 'docs', 'tutorial', 'guide', 'example']):
+        await handle_web_search_request(agent, user_input)
+        return
     
-    code = await agent.generate_code(user_input)
+    # Use AI to understand and respond to the request
+    response = await agent.ollama_client.generate_response(
+        f"Help the user with this request: {user_input}",
+        system_prompt="You are Hurricane, an AI coding assistant. Provide helpful, concise responses about programming and development."
+    )
     
     console.print(Panel(
-        code,
-        title="🚀 Generated Code",
-        border_style="green"
+        response,
+        title="🤖 Hurricane Response",
+        border_style="blue"
     ))
     
-    if Confirm.ask("Would you like me to save this to a file?"):
-        filename = Prompt.ask("Enter filename", default="generated_code.py")
-        await agent.file_manager.save_file(Path(filename), code)
-        show_file_changes({filename: {"description": "Created new file with generated code"}})
+    # For code generation requests, offer to save the response
+    if any(word in user_input.lower() for word in ['generate', 'create', 'write', 'build']):
+        if Confirm.ask("Would you like me to save this to a file?"):
+            filename = Prompt.ask("Enter filename", default="generated_code.py")
+            await agent.file_manager.save_file(Path(filename), response)
+            show_file_changes({filename: {"description": "Created new file with generated content"}})
 
 console = Console()
 
